@@ -48,6 +48,7 @@ var (
 	flagNumValidators           = "v"
 	flagOutputDir               = "output-dir"
 	flagNodeDaemonHome          = "node-daemon-home"
+	flagSpecifiedIPAddress      = "specified-ip-address"
 	flagStartingIPAddress       = "starting-ip-address"
 	flagBtcNetwork              = "btc-network"
 	flagAdditionalSenderAccount = "additional-sender-account"
@@ -82,6 +83,7 @@ Example:
 			minGasPrices, _ := cmd.Flags().GetString(server.FlagMinGasPrices)
 			nodeDirPrefix, _ := cmd.Flags().GetString(flagNodeDirPrefix)
 			nodeDaemonHome, _ := cmd.Flags().GetString(flagNodeDaemonHome)
+			specifiedIPAddress, _ := cmd.Flags().GetStringSlice(flagSpecifiedIPAddress)
 			startingIPAddress, _ := cmd.Flags().GetString(flagStartingIPAddress)
 			numValidators, _ := cmd.Flags().GetInt(flagNumValidators)
 			algo, _ := cmd.Flags().GetString(flags.FlagKeyType)
@@ -103,7 +105,7 @@ Example:
 
 			return InitTestnet(
 				clientCtx, cmd, config, mbm, genBalIterator, outputDir, genesisCliArgs.ChainID, minGasPrices,
-				nodeDirPrefix, nodeDaemonHome, startingIPAddress, keyringBackend, algo, numValidators,
+				nodeDirPrefix, nodeDaemonHome, startingIPAddress, keyringBackend, algo, specifiedIPAddress, numValidators,
 				btcNetwork, additionalAccount, timeBetweenBlocks,
 				clientCtx.TxConfig.SigningContext().ValidatorAddressCodec(), genesisParams,
 			)
@@ -114,6 +116,7 @@ Example:
 	cmd.Flags().StringP(flagOutputDir, "o", "./mytestnet", "Directory to store initialization data for the testnet")
 	cmd.Flags().String(flagNodeDirPrefix, "node", "Prefix the directory name for each node with (node results in node0, node1, ...)")
 	cmd.Flags().String(flagNodeDaemonHome, "babylond", "Home directory of the node's daemon configuration")
+	cmd.Flags().StringSlice(flagSpecifiedIPAddress, []string{}, "Specify public IP address, if it exists that will cover starting-ip-address. Default value is empty")
 	cmd.Flags().String(flagStartingIPAddress, "192.168.0.1", "Starting IP address (192.168.0.1 results in persistent peers list ID0@192.168.0.1:46656, ID1@192.168.0.2:46656, ...)")
 	cmd.Flags().String(server.FlagMinGasPrices, fmt.Sprintf("0.000006%s", appparams.BaseCoinUnit), "Minimum gas prices to accept for transactions; All fees in a tx must meet this minimum (e.g. 0.001bbn)")
 	cmd.Flags().String(flags.FlagKeyringBackend, flags.DefaultKeyringBackend, "Select keyring's backend (os|file|test)")
@@ -143,6 +146,7 @@ func InitTestnet(
 	startingIPAddress,
 	keyringBackend,
 	algoStr string,
+	specifiedIPAddress []string,
 	numValidators int,
 	btcNetwork string,
 	additionalAccount bool,
@@ -203,10 +207,28 @@ func InitTestnet(
 
 		nodeConfig.Moniker = nodeDirName
 
-		ip, err := getIP(i, startingIPAddress)
-		if err != nil {
-			_ = os.RemoveAll(outputDir)
-			return err
+		var (
+			ip  string
+			err error
+		)
+		ipLength := len(specifiedIPAddress)
+		fmt.Println("1111: ", ipLength)
+		if ipLength == 0 {
+			fmt.Println("2222")
+			if ip, err = getIP(i, startingIPAddress); err != nil {
+				fmt.Println("3333")
+				_ = os.RemoveAll(outputDir)
+				return err
+			}
+		} else {
+			fmt.Println("4444")
+			if ipLength != numValidators {
+				fmt.Println("5555")
+				_ = os.RemoveAll(outputDir)
+				return fmt.Errorf("invalid specified ip address length, got: %d, expected: %d", ipLength, numValidators)
+			}
+			fmt.Println("6666")
+			ip = specifiedIPAddress[i]
 		}
 
 		// generate account key
