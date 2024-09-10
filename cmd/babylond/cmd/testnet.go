@@ -212,22 +212,16 @@ func InitTestnet(
 			err error
 		)
 		ipLength := len(specifiedIPAddress)
-		fmt.Println("1111: ", ipLength)
 		if ipLength == 0 {
-			fmt.Println("2222")
 			if ip, err = getIP(i, startingIPAddress); err != nil {
-				fmt.Println("3333")
 				_ = os.RemoveAll(outputDir)
 				return err
 			}
 		} else {
-			fmt.Println("4444")
 			if ipLength != numValidators {
-				fmt.Println("5555")
 				_ = os.RemoveAll(outputDir)
 				return fmt.Errorf("invalid specified ip address length, got: %d, expected: %d", ipLength, numValidators)
 			}
-			fmt.Println("6666")
 			ip = specifiedIPAddress[i]
 		}
 
@@ -382,7 +376,7 @@ func InitTestnet(
 
 			coins := sdk.Coins{
 				sdk.NewCoin("testtoken", math.NewInt(1000000000)),
-				sdk.NewCoin(genesisParams.NativeCoinMetadatas[0].Base, math.NewInt(1000000000000)),
+				sdk.NewCoin(genesisParams.NativeCoinMetadatas[0].Base, math.NewInt(1_000_000_000_000_000)),
 			}
 
 			genBalances = append(genBalances, banktypes.Balance{Address: addr.String(), Coins: coins.Sort()})
