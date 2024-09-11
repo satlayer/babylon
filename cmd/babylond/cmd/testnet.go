@@ -186,7 +186,7 @@ func InitTestnet(
 		var nodeDirName string
 		ipLength := len(specifiedIPAddress)
 		if ipLength != 0 {
-			nodeDirName = fmt.Sprintf("%s_%s", nodeDirPrefix, specifiedIPAddress[i])
+			nodeDirName = fmt.Sprintf("%s-%s", nodeDirPrefix, specifiedIPAddress[i])
 		} else {
 			nodeDirName = fmt.Sprintf("%s%d", nodeDirPrefix, i)
 		}
@@ -353,7 +353,7 @@ func InitTestnet(
 			ipLength := len(specifiedIPAddress)
 			var nodeDirName string
 			if ipLength != 0 {
-				nodeDirName = fmt.Sprintf("%s_%s", nodeDirPrefix, specifiedIPAddress[i])
+				nodeDirName = fmt.Sprintf("%s-%s", nodeDirPrefix, specifiedIPAddress[i])
 			} else {
 				nodeDirName = fmt.Sprintf("%s%d", nodeDirPrefix, i)
 			}
@@ -370,7 +370,16 @@ func InitTestnet(
 			if err != nil {
 				return err
 			}
-			addr, secret, err := testutil.GenerateSaveCoinKey(kb, "test-spending-key", "", true, algo)
+
+			var (
+				addr   sdk.AccAddress
+				secret string
+			)
+			if ipLength != 0 {
+				addr, secret, err = testutil.GenerateSaveCoinKey(kb, fmt.Sprintf("%s-fund-key", specifiedIPAddress[i]), "", true, algo)
+			} else {
+				addr, secret, err = testutil.GenerateSaveCoinKey(kb, "test-spending-key", "", true, algo)
+			}
 			if err != nil {
 				_ = os.RemoveAll(outputDir)
 				return err
@@ -468,7 +477,7 @@ func collectGenFiles(
 		var nodeDirName string
 		ipLength := len(specifiedIPAddress)
 		if ipLength != 0 {
-			nodeDirName = fmt.Sprintf("%s_%s", nodeDirPrefix, specifiedIPAddress[i])
+			nodeDirName = fmt.Sprintf("%s-%s", nodeDirPrefix, specifiedIPAddress[i])
 		} else {
 			nodeDirName = fmt.Sprintf("%s%d", nodeDirPrefix, i)
 		}
