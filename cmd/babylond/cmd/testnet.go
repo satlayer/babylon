@@ -183,7 +183,13 @@ func InitTestnet(
 	inBuf := bufio.NewReader(cmd.InOrStdin())
 	// generate private keys, node IDs, and initial transactions
 	for i := 0; i < numValidators; i++ {
-		nodeDirName := fmt.Sprintf("%s%d", nodeDirPrefix, i)
+		var nodeDirName string
+		ipLength := len(specifiedIPAddress)
+		if ipLength != 0 {
+			nodeDirName = fmt.Sprintf("%s_%s", nodeDirPrefix, specifiedIPAddress[i])
+		} else {
+			nodeDirName = fmt.Sprintf("%s%d", nodeDirPrefix, i)
+		}
 		nodeDir := filepath.Join(outputDir, nodeDirName, nodeDaemonHome)
 		gentxsDir := filepath.Join(outputDir, "gentxs")
 
@@ -211,7 +217,6 @@ func InitTestnet(
 			ip  string
 			err error
 		)
-		ipLength := len(specifiedIPAddress)
 		if ipLength == 0 {
 			if ip, err = getIP(i, startingIPAddress); err != nil {
 				_ = os.RemoveAll(outputDir)
@@ -265,10 +270,11 @@ func InitTestnet(
 		}
 
 		accTokens := sdk.TokensFromConsensusPower(1000, sdk.DefaultPowerReduction)
-		accStakingTokens := sdk.TokensFromConsensusPower(500, sdk.DefaultPowerReduction)
+		// accStakingTokens := sdk.TokensFromConsensusPower(500, sdk.DefaultPowerReduction)
 		coins := sdk.Coins{
 			sdk.NewCoin("testtoken", accTokens),
-			sdk.NewCoin(genesisParams.NativeCoinMetadatas[0].Base, accStakingTokens),
+			// sdk.NewCoin(genesisParams.NativeCoinMetadatas[0].Base, accStakingTokens),
+			sdk.NewCoin(genesisParams.NativeCoinMetadatas[0].Base, math.NewInt(1_000_000_000_000_000)),
 		}
 
 		genBalances = append(genBalances, banktypes.Balance{Address: addr.String(), Coins: coins.Sort()})
@@ -344,7 +350,13 @@ func InitTestnet(
 
 	if additionalAccount {
 		for i := 0; i < numValidators; i++ {
-			nodeDirName := fmt.Sprintf("%s%d", nodeDirPrefix, i)
+			ipLength := len(specifiedIPAddress)
+			var nodeDirName string
+			if ipLength != 0 {
+				nodeDirName = fmt.Sprintf("%s_%s", nodeDirPrefix, specifiedIPAddress[i])
+			} else {
+				nodeDirName = fmt.Sprintf("%s%d", nodeDirPrefix, i)
+			}
 			nodeDir := filepath.Join(outputDir, nodeDirName, nodeDaemonHome)
 
 			// generate account key
@@ -376,7 +388,7 @@ func InitTestnet(
 
 			coins := sdk.Coins{
 				sdk.NewCoin("testtoken", math.NewInt(1000000000)),
-				sdk.NewCoin(genesisParams.NativeCoinMetadatas[0].Base, math.NewInt(1_000_000_000_000_000)),
+				sdk.NewCoin(genesisParams.NativeCoinMetadatas[0].Base, math.NewInt(1_000_000_000_000_000_000)),
 			}
 
 			genBalances = append(genBalances, banktypes.Balance{Address: addr.String(), Coins: coins.Sort()})
@@ -391,7 +403,7 @@ func InitTestnet(
 	}
 
 	err := collectGenFiles(
-		clientCtx, nodeConfig, chainID, nodeIDs, genKeys, numValidators,
+		clientCtx, nodeConfig, chainID, nodeIDs, specifiedIPAddress, genKeys, numValidators,
 		outputDir, nodeDirPrefix, nodeDaemonHome, genBalIterator,
 	)
 	if err != nil {
@@ -445,7 +457,7 @@ func initGenFiles(
 
 func collectGenFiles(
 	clientCtx client.Context, nodeConfig *cmtconfig.Config, chainID string,
-	nodeIDs []string, genKeys []*checkpointingtypes.GenesisKey, numValidators int,
+	nodeIDs, specifiedIPAddress []string, genKeys []*checkpointingtypes.GenesisKey, numValidators int,
 	outputDir, nodeDirPrefix, nodeDaemonHome string, genBalIterator banktypes.GenesisBalancesIterator,
 ) error {
 
@@ -453,7 +465,13 @@ func collectGenFiles(
 	genTime := cmttime.Now()
 
 	for i := 0; i < numValidators; i++ {
-		nodeDirName := fmt.Sprintf("%s%d", nodeDirPrefix, i)
+		var nodeDirName string
+		ipLength := len(specifiedIPAddress)
+		if ipLength != 0 {
+			nodeDirName = fmt.Sprintf("%s_%s", nodeDirPrefix, specifiedIPAddress[i])
+		} else {
+			nodeDirName = fmt.Sprintf("%s%d", nodeDirPrefix, i)
+		}
 		nodeDir := filepath.Join(outputDir, nodeDirName, nodeDaemonHome)
 		gentxsDir := filepath.Join(outputDir, "gentxs")
 		nodeConfig.Moniker = nodeDirName
