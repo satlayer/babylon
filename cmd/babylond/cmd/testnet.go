@@ -130,6 +130,7 @@ Example:
 }
 
 const nodeDirPerm = 0755
+const validatorName = "sat-testnet-validator-%d"
 
 // InitTestnet initialize the testnet
 func InitTestnet(
@@ -186,7 +187,7 @@ func InitTestnet(
 		var nodeDirName string
 		ipLength := len(specifiedIPAddress)
 		if ipLength != 0 {
-			nodeDirName = fmt.Sprintf("%s-%s", nodeDirPrefix, specifiedIPAddress[i])
+			nodeDirName = fmt.Sprintf(validatorName, i)
 		} else {
 			nodeDirName = fmt.Sprintf("%s%d", nodeDirPrefix, i)
 		}
@@ -353,7 +354,8 @@ func InitTestnet(
 			ipLength := len(specifiedIPAddress)
 			var nodeDirName string
 			if ipLength != 0 {
-				nodeDirName = fmt.Sprintf("%s-%s", nodeDirPrefix, specifiedIPAddress[i])
+				nodeDirName = fmt.Sprintf(validatorName, i)
+				// nodeDirName = fmt.Sprintf("%s-%s", nodeDirPrefix, specifiedIPAddress[i])
 			} else {
 				nodeDirName = fmt.Sprintf("%s%d", nodeDirPrefix, i)
 			}
@@ -376,7 +378,7 @@ func InitTestnet(
 				secret string
 			)
 			if ipLength != 0 {
-				addr, secret, err = testutil.GenerateSaveCoinKey(kb, fmt.Sprintf("%s-fund-key", specifiedIPAddress[i]), "", true, algo)
+				addr, secret, err = testutil.GenerateSaveCoinKey(kb, fmt.Sprintf("%s-fund-key", fmt.Sprintf(validatorName, i)), "", true, algo)
 			} else {
 				addr, secret, err = testutil.GenerateSaveCoinKey(kb, "test-spending-key", "", true, algo)
 			}
@@ -477,7 +479,7 @@ func collectGenFiles(
 		var nodeDirName string
 		ipLength := len(specifiedIPAddress)
 		if ipLength != 0 {
-			nodeDirName = fmt.Sprintf("%s-%s", nodeDirPrefix, specifiedIPAddress[i])
+			nodeDirName = fmt.Sprintf(validatorName, i)
 		} else {
 			nodeDirName = fmt.Sprintf("%s%d", nodeDirPrefix, i)
 		}
