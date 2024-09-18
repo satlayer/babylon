@@ -48,6 +48,7 @@ var (
 	flagNumValidators           = "v"
 	flagOutputDir               = "output-dir"
 	flagNodeDaemonHome          = "node-daemon-home"
+	flagSpecifiedIPAddress      = "specified-ip-address"
 	flagStartingIPAddress       = "starting-ip-address"
 	flagBtcNetwork              = "btc-network"
 	flagAdditionalSenderAccount = "additional-sender-account"
@@ -82,6 +83,7 @@ Example:
 			minGasPrices, _ := cmd.Flags().GetString(server.FlagMinGasPrices)
 			nodeDirPrefix, _ := cmd.Flags().GetString(flagNodeDirPrefix)
 			nodeDaemonHome, _ := cmd.Flags().GetString(flagNodeDaemonHome)
+			specifiedIPAddress, _ := cmd.Flags().GetStringSlice(flagSpecifiedIPAddress)
 			startingIPAddress, _ := cmd.Flags().GetString(flagStartingIPAddress)
 			numValidators, _ := cmd.Flags().GetInt(flagNumValidators)
 			algo, _ := cmd.Flags().GetString(flags.FlagKeyType)
@@ -103,7 +105,7 @@ Example:
 
 			return InitTestnet(
 				clientCtx, cmd, config, mbm, genBalIterator, outputDir, genesisCliArgs.ChainID, minGasPrices,
-				nodeDirPrefix, nodeDaemonHome, startingIPAddress, keyringBackend, algo, numValidators,
+				nodeDirPrefix, nodeDaemonHome, startingIPAddress, keyringBackend, algo, specifiedIPAddress, numValidators,
 				btcNetwork, additionalAccount, timeBetweenBlocks,
 				clientCtx.TxConfig.SigningContext().ValidatorAddressCodec(), genesisParams,
 			)
@@ -114,6 +116,7 @@ Example:
 	cmd.Flags().StringP(flagOutputDir, "o", "./mytestnet", "Directory to store initialization data for the testnet")
 	cmd.Flags().String(flagNodeDirPrefix, "node", "Prefix the directory name for each node with (node results in node0, node1, ...)")
 	cmd.Flags().String(flagNodeDaemonHome, "babylond", "Home directory of the node's daemon configuration")
+	cmd.Flags().StringSlice(flagSpecifiedIPAddress, []string{}, "Specify public IP address, if it exists that will cover starting-ip-address. Default value is empty")
 	cmd.Flags().String(flagStartingIPAddress, "192.168.0.1", "Starting IP address (192.168.0.1 results in persistent peers list ID0@192.168.0.1:46656, ID1@192.168.0.2:46656, ...)")
 	cmd.Flags().String(server.FlagMinGasPrices, fmt.Sprintf("0.000006%s", appparams.BaseCoinUnit), "Minimum gas prices to accept for transactions; All fees in a tx must meet this minimum (e.g. 0.001bbn)")
 	cmd.Flags().String(flags.FlagKeyringBackend, flags.DefaultKeyringBackend, "Select keyring's backend (os|file|test)")
@@ -127,6 +130,7 @@ Example:
 }
 
 const nodeDirPerm = 0755
+const validatorName = "sat-testnet-validator-%d"
 
 // InitTestnet initialize the testnet
 func InitTestnet(
@@ -143,6 +147,7 @@ func InitTestnet(
 	startingIPAddress,
 	keyringBackend,
 	algoStr string,
+	specifiedIPAddress []string,
 	numValidators int,
 	btcNetwork string,
 	additionalAccount bool,
@@ -179,7 +184,13 @@ func InitTestnet(
 	inBuf := bufio.NewReader(cmd.InOrStdin())
 	// generate private keys, node IDs, and initial transactions
 	for i := 0; i < numValidators; i++ {
-		nodeDirName := fmt.Sprintf("%s%d", nodeDirPrefix, i)
+		var nodeDirName string
+		ipLength := len(specifiedIPAddress)
+		if ipLength != 0 {
+			nodeDirName = fmt.Sprintf(validatorName, i)
+		} else {
+			nodeDirName = fmt.Sprintf("%s%d", nodeDirPrefix, i)
+		}
 		nodeDir := filepath.Join(outputDir, nodeDirName, nodeDaemonHome)
 		gentxsDir := filepath.Join(outputDir, "gentxs")
 
@@ -203,10 +214,21 @@ func InitTestnet(
 
 		nodeConfig.Moniker = nodeDirName
 
-		ip, err := getIP(i, startingIPAddress)
-		if err != nil {
-			_ = os.RemoveAll(outputDir)
-			return err
+		var (
+			ip  string
+			err error
+		)
+		if ipLength == 0 {
+			if ip, err = getIP(i, startingIPAddress); err != nil {
+				_ = os.RemoveAll(outputDir)
+				return err
+			}
+		} else {
+			if ipLength != numValidators {
+				_ = os.RemoveAll(outputDir)
+				return fmt.Errorf("invalid specified ip address length, got: %d, expected: %d", ipLength, numValidators)
+			}
+			ip = specifiedIPAddress[i]
 		}
 
 		// generate account key
@@ -249,10 +271,11 @@ func InitTestnet(
 		}
 
 		accTokens := sdk.TokensFromConsensusPower(1000, sdk.DefaultPowerReduction)
-		accStakingTokens := sdk.TokensFromConsensusPower(500, sdk.DefaultPowerReduction)
+		// accStakingTokens := sdk.TokensFromConsensusPower(500, sdk.DefaultPowerReduction)
 		coins := sdk.Coins{
 			sdk.NewCoin("testtoken", accTokens),
-			sdk.NewCoin(genesisParams.NativeCoinMetadatas[0].Base, accStakingTokens),
+			// sdk.NewCoin(genesisParams.NativeCoinMetadatas[0].Base, accStakingTokens),
+			sdk.NewCoin(genesisParams.NativeCoinMetadatas[0].Base, math.NewInt(1_000_000_000_000_000)),
 		}
 
 		genBalances = append(genBalances, banktypes.Balance{Address: addr.String(), Coins: coins.Sort()})
@@ -328,7 +351,14 @@ func InitTestnet(
 
 	if additionalAccount {
 		for i := 0; i < numValidators; i++ {
-			nodeDirName := fmt.Sprintf("%s%d", nodeDirPrefix, i)
+			ipLength := len(specifiedIPAddress)
+			var nodeDirName string
+			if ipLength != 0 {
+				nodeDirName = fmt.Sprintf(validatorName, i)
+				// nodeDirName = fmt.Sprintf("%s-%s", nodeDirPrefix, specifiedIPAddress[i])
+			} else {
+				nodeDirName = fmt.Sprintf("%s%d", nodeDirPrefix, i)
+			}
 			nodeDir := filepath.Join(outputDir, nodeDirName, nodeDaemonHome)
 
 			// generate account key
@@ -342,7 +372,16 @@ func InitTestnet(
 			if err != nil {
 				return err
 			}
-			addr, secret, err := testutil.GenerateSaveCoinKey(kb, "test-spending-key", "", true, algo)
+
+			var (
+				addr   sdk.AccAddress
+				secret string
+			)
+			if ipLength != 0 {
+				addr, secret, err = testutil.GenerateSaveCoinKey(kb, fmt.Sprintf("%s-fund-key", fmt.Sprintf(validatorName, i)), "", true, algo)
+			} else {
+				addr, secret, err = testutil.GenerateSaveCoinKey(kb, "test-spending-key", "", true, algo)
+			}
 			if err != nil {
 				_ = os.RemoveAll(outputDir)
 				return err
@@ -360,7 +399,7 @@ func InitTestnet(
 
 			coins := sdk.Coins{
 				sdk.NewCoin("testtoken", math.NewInt(1000000000)),
-				sdk.NewCoin(genesisParams.NativeCoinMetadatas[0].Base, math.NewInt(1000000000000)),
+				sdk.NewCoin(genesisParams.NativeCoinMetadatas[0].Base, math.NewInt(1_000_000_000_000_000_000)),
 			}
 
 			genBalances = append(genBalances, banktypes.Balance{Address: addr.String(), Coins: coins.Sort()})
@@ -375,7 +414,7 @@ func InitTestnet(
 	}
 
 	err := collectGenFiles(
-		clientCtx, nodeConfig, chainID, nodeIDs, genKeys, numValidators,
+		clientCtx, nodeConfig, chainID, nodeIDs, specifiedIPAddress, genKeys, numValidators,
 		outputDir, nodeDirPrefix, nodeDaemonHome, genBalIterator,
 	)
 	if err != nil {
@@ -429,7 +468,7 @@ func initGenFiles(
 
 func collectGenFiles(
 	clientCtx client.Context, nodeConfig *cmtconfig.Config, chainID string,
-	nodeIDs []string, genKeys []*checkpointingtypes.GenesisKey, numValidators int,
+	nodeIDs, specifiedIPAddress []string, genKeys []*checkpointingtypes.GenesisKey, numValidators int,
 	outputDir, nodeDirPrefix, nodeDaemonHome string, genBalIterator banktypes.GenesisBalancesIterator,
 ) error {
 
@@ -437,7 +476,13 @@ func collectGenFiles(
 	genTime := cmttime.Now()
 
 	for i := 0; i < numValidators; i++ {
-		nodeDirName := fmt.Sprintf("%s%d", nodeDirPrefix, i)
+		var nodeDirName string
+		ipLength := len(specifiedIPAddress)
+		if ipLength != 0 {
+			nodeDirName = fmt.Sprintf(validatorName, i)
+		} else {
+			nodeDirName = fmt.Sprintf("%s%d", nodeDirPrefix, i)
+		}
 		nodeDir := filepath.Join(outputDir, nodeDirName, nodeDaemonHome)
 		gentxsDir := filepath.Join(outputDir, "gentxs")
 		nodeConfig.Moniker = nodeDirName
